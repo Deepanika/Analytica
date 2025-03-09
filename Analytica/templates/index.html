@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twitter Analysis</title>
+    <style>
+        /* Page background */
+        body {
+            background-color: #f0f2f5;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        /* Form styling */
+        .form-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        input, select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #3498db;
+            color: #fff;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background-color: #95a5a6;
+        }
+
+        /* Results section */
+        #results h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+            margin-bottom: 20px;
+        }
+
+        /* Tweet card styling */
+        .tweet-card {
+            background-color: #fff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .tweet-card-sentiment {
+            border-left: 5px solid #3498db;
+        }
+
+        .tweet-card-toxicity {
+            border-left: 5px solid #9b59b6;
+        }
+
+        .tweet-card-emotion {
+            border-left: 5px solid #e67e22;
+        }
+
+        .tweet-handle {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .tweet-content {
+            margin-top: 5px;
+            word-wrap: break-word;
+        }
+
+        .tweet-timestamp {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .tweet-analysis {
+            margin-top: 10px;
+        }
+
+        .analysis-badge {
+            padding: 2px 8px;
+            border-radius: 10px;
+            color: #fff;
+        }
+
+        /* Error message */
+        .error-message {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        /* Responsive layout */
+        @media (min-width: 768px) {
+            #tweet-list {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Twitter Analysis</h1>
+    <div class="form-container">
+        <form id="analysis-form">
+            <div class="form-group">
+                <label for="analysis_type">Select Analysis Type:</label>
+                <select id="analysis_type" name="analysis_type">
+                    <option value="sentiment">Sentiment</option>
+                    <option value="toxicity">Toxicity</option>
+                    <option value="emotion">Emotion</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username">
+            </div>
+            <div class="form-group">
+                <label for="hashtag">Hashtag:</label>
+                <input type="text" id="hashtag" name="hashtag">
+                <small>(Enter either username or hashtag, not both)</small>
+            </div>
+            <div class="form-group">
+                <label for="max_tweets">Number of Tweets:</label>
+                <input type="number" id="max_tweets" name="max_tweets" value="10" min="1" max="50">
+            </div>
+            <button type="submit">Analyze</button>
+        </form>
+    </div>
+
+    <div id="results">
+        <h2>Results</h2>
+        <div id="tweet-list"></div>
+    </div>
+
+    <script>
+        function getAnalysisColor(type, value) {
+            if (type === 'sentiment') {
+                if (value === 'Positive') return '#2ecc71';
+                if (value === 'Negative') return '#e74c3c';
+                if (value === 'Neutral') return '#95a5a6';
+            } else if (type === 'toxicity') {
+                if (value === 'Toxic') return '#e74c3c';
+                if (value === 'Non-toxic') return '#2ecc71';
+            } else if (type === 'emotion') {
+                return '#e67e22';
+            }
+            return '#95a5a6';
+        }
+
+        const form = document.getElementById('analysis-form');
+        const submitButton = form.querySelector('button[type="submit"]');
+
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            submitButton.disabled = true;
+            submitButton.textContent = 'Analyzing...';
+
+            const analysisType = document.getElementById('analysis_type').value;
+            const formData = new FormData(this);
+            const data = { analysis_type: analysisType };
+            formData.forEach((value, key) => {
+                if (value && key !== 'analysis_type') {
+                    data[key] = value;
+                }
+            });
+
+            fetch('/api/tweets/scrape/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw err; });
+                }
+                return response.json();
+            })
+            .then(data => {
+                const tweetList = document.getElementById('tweet-list');
+                tweetList.innerHTML = '';
+                if (data.error || data.message) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.classList.add('error-message');
+                    errorDiv.textContent = data.error || data.message;
+                    tweetList.appendChild(errorDiv);
+                } else {
+                    data.forEach(tweet => {
+                        const card = document.createElement('div');
+                        card.classList.add('tweet-card', 'tweet-card-' + analysisType);
+
+                        const handle = document.createElement('div');
+                        handle.classList.add('tweet-handle');
+                        handle.textContent = tweet.handle;
+                        card.appendChild(handle);
+
+                        const content = document.createElement('div');
+                        content.classList.add('tweet-content');
+                        content.textContent = tweet.content;
+                        card.appendChild(content);
+
+                        const timestamp = document.createElement('div');
+                        timestamp.classList.add('tweet-timestamp');
+                        timestamp.textContent = tweet.timestamp || "Timestamp unavailable";
+                        card.appendChild(timestamp);
+
+
+                        const analysisP = document.createElement('p');
+                        analysisP.classList.add('tweet-analysis');
+                        const analysisText = document.createTextNode(analysisType.charAt(0).toUpperCase() + analysisType.slice(1) + ': ');
+                        const badge = document.createElement('span');
+                        badge.classList.add('analysis-badge');
+                        badge.textContent = tweet[analysisType] || 'N/A';
+                        badge.style.backgroundColor = getAnalysisColor(analysisType, tweet[analysisType]);
+                        analysisP.appendChild(analysisText);
+                        analysisP.appendChild(badge);
+                        card.appendChild(analysisP);
+
+                        tweetList.appendChild(card);
+                    });
+                }
+                submitButton.disabled = false;
+                submitButton.textContent = 'Analyze';
+            })
+            .catch(error => {
+                const tweetList = document.getElementById('tweet-list');
+                tweetList.innerHTML = '';
+                const errorDiv = document.createElement('div');
+                errorDiv.classList.add('error-message');
+                errorDiv.textContent = 'An error occurred: ' + (error.message || 'Please try again.');
+                tweetList.appendChild(errorDiv);
+                submitButton.disabled = false;
+                submitButton.textContent = 'Analyze';
+            });
+        });
+    </script>
+</body>
+</html>
