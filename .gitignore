@@ -1,0 +1,4 @@
+/venv
+/Analytica/models/sentiment_model.pkl
+/Analytica/models/tfidf_vectorizer.pkl
+/Analytica/models/toxicity_model.pkl
