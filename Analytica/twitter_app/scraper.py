@@ -19,13 +19,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 TWITTER_LOGIN_URL = "https://twitter.com/i/flow/login"
 
 class Tweet:
-    def __init__(self, card, driver, username):
+    def __init__(self, card, driver, username=None, is_hashtag=False):
         self.tweet = None
         self.error = False
         try:
             handle = card.find_element("xpath", ".//span[starts-with(text(), '@')]").text
             content = card.find_element("xpath", ".//div[@data-testid='tweetText']").text
-            if handle == f"@{username}" and content:
+            # Collect all tweets for hashtag scraping, or filter by username for profile scraping
+            if is_hashtag or (handle == f"@{username}" and content):
                 self.tweet = {
                     "content": content,
                     "handle": handle,
@@ -39,7 +40,26 @@ class Tweet:
             logging.error("Error extracting tweet data")
 
 class TwitterScraper:
+    _instance = None
+
+    @classmethod
+    def get_instance(cls, mail=None, username=None, password=None):
+        """
+        Get the singleton instance of TwitterScraper, creating it if necessary.
+        """
+        if cls._instance is None:
+            if not all([mail, username, password]):
+                raise ValueError("Missing Twitter credentials for scraper initialization")
+            cls._instance = cls(mail, username, password)
+        return cls._instance
+
     def __init__(self, mail, username, password):
+        """
+        Initialize the scraper with credentials and log in to Twitter.
+        Raises RuntimeError if called directly instead of using get_instance().
+        """
+        if self._instance is not None:
+            raise RuntimeError("Use get_instance() to get the TwitterScraper instance")
         self.mail = mail
         self.username = username
         self.password = password
@@ -123,7 +143,8 @@ class TwitterScraper:
                 tweet_id = str(hash(card))
                 if tweet_id not in self.tweet_ids:
                     self.tweet_ids.add(tweet_id)
-                    tweet = Tweet(card, self.driver,scrape_username)
+                    # Pass is_hashtag=True for hashtag scraping
+                    tweet = Tweet(card, self.driver, scrape_username, is_hashtag=bool(scrape_hashtag))
                     if not tweet.error and tweet.tweet:
                         self.data.append(tweet.tweet)
                         new_tweets_added = True
