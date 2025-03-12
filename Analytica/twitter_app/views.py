@@ -5,11 +5,12 @@ from rest_framework import viewsets, status
 from .models import Tweet
 from .serializers import TweetSerializer
 from .scraper import TwitterScraper
-from .analyzer import analyzer
+from .analyzer import analyze_tweet
 from dotenv import load_dotenv
 import os
 import logging
 from django.db.models import Q
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ class SentimentViewSet(BaseTweetViewSet):
             tweets = self.save_tweets_to_db(tweets_data)
             analyzed_tweets = []
             for tweet in tweets:
-                analyzed_tweet = analyzer.analyze(tweet, "sentiment")
+                analyzed_tweet = analyze_tweet(tweet, "sentiment")
                 analyzed_tweets.append(TweetSerializer(analyzed_tweet).data)
 
             return Response(analyzed_tweets)
@@ -154,7 +155,7 @@ class ToxicityViewSet(BaseTweetViewSet):
             tweets = self.save_tweets_to_db(tweets_data)
             analyzed_tweets = []
             for tweet in tweets:
-                analyzed_tweet = analyzer.analyze(tweet, "toxicity")
+                analyzed_tweet = analyze_tweet(tweet, "toxicity")
                 analyzed_tweets.append(TweetSerializer(analyzed_tweet).data)
 
             return Response(analyzed_tweets)
@@ -201,7 +202,7 @@ class EmotionViewSet(BaseTweetViewSet):
             tweets = self.save_tweets_to_db(tweets_data)
             analyzed_tweets = []
             for tweet in tweets:
-                analyzed_tweet = analyzer.analyze(tweet, "emotion")
+                analyzed_tweet = analyze_tweet(tweet, "emotion")
                 analyzed_tweets.append(TweetSerializer(analyzed_tweet).data)
 
             return Response(analyzed_tweets)
@@ -278,7 +279,7 @@ class TweetViewSet(viewsets.ModelViewSet):
         try:
             # Validate analysis type
             analysis_type = request.data.get("analysis_type")
-            if analysis_type not in ["sentiment", "toxicity", "emotion"]:
+            if analysis_type not in ["sentiment", "toxicity", "emotion", "offensive"]:
                 return Response({"error": "Invalid analysis type"}, status=400)
 
             # Validate username or hashtag input
@@ -314,17 +315,12 @@ class TweetViewSet(viewsets.ModelViewSet):
                     },
                 )
                 tweets.append(tweet)
-            print("\n##########################################\n")
-            print(tweets)
 
             # Analyze tweets and prepare response
             analyzed_tweets = []
             for tweet in tweets:
-                analyzed_tweet = analyzer.analyze(tweet, analysis_type)
+                analyzed_tweet = analyze_tweet(tweet, analysis_type)
                 analyzed_tweets.append(TweetSerializer(analyzed_tweet).data)
-
-            print("\n##########################################\n")
-            print(analyzed_tweets)
 
             return Response(analyzed_tweets)
         except Exception as e:

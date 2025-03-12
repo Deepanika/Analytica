@@ -1,54 +1,125 @@
 import joblib
 import pickle
 from .models import Tweet  # Import the Tweet model
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import numpy as np
+from scipy.special import softmax
 
-class Analyzer:
+def preprocess(text):
+    new_text = []
+    for t in text.split(" "):
+        t = '@user' if t.startswith('@') and len(t) > 1 else t
+        t = 'http' if t.startswith('http') else t
+        new_text.append(t)
+    return " ".join(new_text)
+
+class BaseAnalyzer:
+    def analyze(self, tweet):
+        raise NotImplementedError("Subclasses must implement this method")
+
+class SingletonMeta(type):
+    _instances = {}
+    
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+class SentimentAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
     def __init__(self):
-        # Load the sentiment model and vectorizer using joblib
-        try:
-            self.sentiment_model = joblib.load('models/sentiment_model.pkl')
-            self.sentiment_vectorizer = joblib.load('models/tfidf_vectorizer.pkl')
-        except (FileNotFoundError, joblib.externals.loky.process_executor._RemoteTraceback) as e:
-            print(f"Error loading sentiment model or vectorizer: {e}")
-            self.sentiment_model = None
-            self.sentiment_vectorizer = None
+        if not hasattr(self, '_initialized'):
+            try:
+                self.model = AutoModelForSequenceClassification.from_pretrained("cardiffnlp/twitter-roberta-base-sentiment")
+                self.tokenizer = AutoTokenizer.from_pretrained("cardiffnlp/twitter-roberta-base-sentiment")
+                self.labels = ["Negative", "Neutral", "Positive"]
+                self._initialized = True
+            except Exception as e:
+                print(f"Error loading sentiment model or tokenizer: {e}")
+                self.model = None
+                self.tokenizer = None
+                self._initialized = False
 
-        # Load the toxicity model using pickle
-        try:
-            with open('models/toxicity_model.pkl', 'rb') as file:
-                self.toxicity_model = pickle.load(file)
-        except (FileNotFoundError, pickle.UnpicklingError) as e:
-            print(f"Error loading toxicity model: {e}")
-            self.toxicity_model = None
-
-        self.emotion_model = None  # Placeholder
-
-    def analyze(self, tweet, analysis_type):
-        content = tweet.content
-        if not content.strip():
-            if analysis_type == 'sentiment':
-                tweet.sentiment = "Unknown"
-            elif analysis_type == 'toxicity':
-                tweet.toxicity = "Unknown"
-            elif analysis_type == 'emotion':
-                tweet.emotion = "Unknown"
-            tweet.save()
-            return tweet
-
-        if analysis_type == 'sentiment' and self.sentiment_model and self.sentiment_vectorizer:
-            # Transform the content using the vectorizer and predict sentiment
-            content_vectorized = self.sentiment_vectorizer.transform([content])
-            sentiment = self.sentiment_model.predict(content_vectorized)[0]
-            tweet.sentiment = "Positive" if sentiment == 1 else "Negative"
-        elif analysis_type == 'toxicity' and self.toxicity_model:
-            # Predict toxicity directly without vectorizing the content
-            toxicity = self.toxicity_model.predict([content])[0]
-            tweet.toxicity = "Toxic" if toxicity == 1 else "Non-Toxic"
-        elif analysis_type == 'emotion':
-            # Placeholder until emotion model is implemented
-            tweet.emotion = "Happy"  # Mock emotion
-
+    def analyze(self, tweet):
+        if self.model is None or self.tokenizer is None:
+            raise RuntimeError("Sentiment model or tokenizer not initialized.")
+        content = preprocess(tweet.content)
+        encoded_input = self.tokenizer(content, return_tensors='pt')
+        output = self.model(**encoded_input)
+        scores = output[0][0].detach().numpy()
+        scores = softmax(scores)
+        sentiment = self.labels[np.argmax(scores)]
+        tweet.sentiment = sentiment
         tweet.save()
         return tweet
 
-analyzer = Analyzer()
+class ToxicityAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
+    def __init__(self):
+        if not hasattr(self, '_initialized'):
+            try:
+                self.model = AutoModelForSequenceClassification.from_pretrained("cardiffnlp/twitter-roberta-base-offensive")
+                self.tokenizer = AutoTokenizer.from_pretrained("cardiffnlp/twitter-roberta-base-offensive")
+                self.labels = ["not-offensive", "offensive"]
+                self._initialized = True
+            except Exception as e:
+                print(f"Error loading offensive model or tokenizer: {e}")
+                self.model = None
+                self.tokenizer = None
+                self._initialized = False
+
+    def analyze(self, tweet):
+        if self.model is None or self.tokenizer is None:
+            raise RuntimeError("Toxicity model or tokenizer not initialized.")
+        content = preprocess(tweet.content)
+        encoded_input = self.tokenizer(content, return_tensors='pt')
+        output = self.model(**encoded_input)
+        scores = output[0][0].detach().numpy()
+        scores = softmax(scores)
+        toxicity = self.labels[np.argmax(scores)]
+        tweet.toxicity = toxicity
+        tweet.save()
+        return tweet
+
+class EmotionAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
+    def __init__(self):
+        if not hasattr(self, '_initialized'):
+            try:
+                self.model = AutoModelForSequenceClassification.from_pretrained("cardiffnlp/twitter-roberta-base-emotion")
+                self.tokenizer = AutoTokenizer.from_pretrained("cardiffnlp/twitter-roberta-base-emotion")
+                self.labels = ["anger", "joy", "optimism", "sadness"]
+                self._initialized = True
+            except Exception as e:
+                print(f"Error loading emotion model or tokenizer: {e}")
+                self.model = None
+                self.tokenizer = None
+                self._initialized = False
+
+    def analyze(self, tweet):
+        if self.model is None or self.tokenizer is None:
+            raise RuntimeError("Emotion model or tokenizer not initialized.")
+        content = preprocess(tweet.content)
+        encoded_input = self.tokenizer(content, return_tensors='pt')
+        output = self.model(**encoded_input)
+        scores = output[0][0].detach().numpy()
+        scores = softmax(scores)
+        emotion = self.labels[np.argmax(scores)]
+        tweet.emotion = emotion
+        tweet.save()
+        return tweet
+
+class AnalyzerFactory:
+    _analyzers = {
+        'sentiment': SentimentAnalyzer(),
+        'toxicity': ToxicityAnalyzer(),
+        'emotion': EmotionAnalyzer()
+    }
+
+    @staticmethod
+    def get_analyzer(analysis_type):
+        if analysis_type not in AnalyzerFactory._analyzers:
+            raise ValueError(f"Unknown analysis type: {analysis_type}")
+        return AnalyzerFactory._analyzers[analysis_type]
+
+# Example usage
+def analyze_tweet(tweet, analysis_type):
+    analyzer = AnalyzerFactory.get_analyzer(analysis_type)
+    return analyzer.analyze(tweet)
