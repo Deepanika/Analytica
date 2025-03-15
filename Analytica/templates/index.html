@@ -158,10 +158,13 @@
                 if (value === 'Negative') return '#e74c3c';
                 if (value === 'Neutral') return '#95a5a6';
             } else if (type === 'toxicity') {
-                if (value === 'Toxic') return '#e74c3c';
-                if (value === 'Non-toxic') return '#2ecc71';
+                if (value === 'offensive') return '#e74c3c';
+                if (value === 'not-offensive') return '#2ecc71';
             } else if (type === 'emotion') {
-                return '#e67e22';
+                if (value === 'anger') return '#e74c3c'; // Red for anger
+                if (value === 'joy') return '#f1c40f'; // Yellow for joy
+                if (value === 'optimism') return '#2ecc71'; // Green for optimism
+                if (value === 'sadness') return '#3498db'; // Blue for sadness
             }
             return '#95a5a6';
         }
