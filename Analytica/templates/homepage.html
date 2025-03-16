@@ -18,6 +18,7 @@
             color: #fff;
             line-height: 1.6;
             overflow-x: hidden;
+            position: relative;
         }
 
         /* Navigation bar */
@@ -60,6 +61,79 @@
             font-weight: bold;
         }
 
+        /* Live Wall Background */
+        .live-wall {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            z-index: 0;
+            padding: 20px;
+            opacity: 0.8;
+            filter: blur(0.5px);
+        }
+
+        .tweet-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: absolute;
+            width: 100%;
+            animation: scrollTweets 30s linear infinite; /* Continuous scroll */
+        }
+
+        /* Original Tweet Card Design with Analysis Badges */
+        .tweet-card {
+            background-color: #fff;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #2ecc71;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .tweet-handle {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+
+        .tweet-content {
+            margin-top: 5px;
+            word-wrap: break-word;
+            color: #666;
+        }
+
+        .tweet-timestamp {
+            color: #999;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .tweet-analysis {
+            margin-top: 10px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .analysis-badge {
+            padding: 2px 8px;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 0.9em;
+        }
+
+        @keyframes scrollTweets {
+            0% { transform: translateY(-100%); } /* Start above viewport */
+            100% { transform: translateY(100vh); } /* End below viewport */
+        }
+
         /* Intro section */
         .intro {
             height: 100vh;
@@ -69,8 +143,9 @@
             align-items: center;
             text-align: center;
             padding: 0 20px;
-            background: url('https://source.unsplash.com/random/1920x1080/?technology') no-repeat center center/cover;
             position: relative;
+            z-index: 1;
+            background: url('https://source.unsplash.com/random/1920x1080/?technology') no-repeat center center/cover;
         }
 
         .intro::before {
@@ -80,8 +155,8 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: -1;
         }
 
         .intro h1, .intro p {
@@ -93,6 +168,7 @@
             font-size: 3.5em;
             margin-bottom: 20px;
             animation: fadeInDown 1s ease;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .intro p {
@@ -100,6 +176,7 @@
             max-width: 800px;
             animation: fadeInUp 1s ease 0.5s;
             animation-fill-mode: both;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
         }
 
         /* Features section */
@@ -108,6 +185,8 @@
             background: #fff;
             color: #333;
             text-align: center;
+            position: relative;
+            z-index: 1;
         }
 
         .features h2 {
@@ -171,6 +250,7 @@
             .intro p { font-size: 1em; }
             nav ul { flex-direction: column; text-align: center; }
             nav ul li { margin: 10px 0; }
+            .tweet-card { max-width: 100%; }
         }
     </style>
 </head>
@@ -182,8 +262,20 @@
             <li><a href="#features">Features</a></li>
             <li><a href="#about">About</a></li>
             <li><a href="#contact">Contact</a></li>
+            {% if not user.is_authenticated %}
+            <li><a href="{% url 'login' %}">Login</a></li>
+            <li><a href="{% url 'register' %}">Register</a></li>
+            {% else %}
+            <li><a href="{% url 'logout' %}">Logout</a></li>
+            <li><a href="{% url 'history' %}">History</a></li>
+            {% endif %}
         </ul>
     </nav>
+
+    <!-- Live Wall Background -->
+    <div class="live-wall">
+        <div class="tweet-container" id="tweet-container"></div>
+    </div>
 
     <!-- Intro Section -->
     <section class="intro">
@@ -195,25 +287,117 @@
     <section class="features" id="features">
         <h2>Our Functionalities</h2>
         <div class="features-container">
-            <div class="feature-card sentiment">
+            <div class="feature-card sentiment" onclick="window.location.href='/analyze?type=sentiment'">
                 <h3>Sentiment Analysis</h3>
                 <p>Understand the mood behind tweets with our advanced sentiment analysis, categorizing them as positive, negative, or neutral.</p>
             </div>
-            <div class="feature-card emotion">
+            <div class="feature-card emotion" onclick="window.location.href='/analyze?type=emotion'">
                 <h3>Emotion Analysis</h3>
                 <p>Detect emotions like happiness, anger, or sadness in real-time tweets to gain deeper insights into user feelings.</p>
             </div>
-            <div class="feature-card toxicity">
+            <div class="feature-card toxicity" onclick="window.location.href='/analyze?type=toxicity'">
                 <h3>Toxicity Analysis</h3>
                 <p>Identify toxic content and hate speech to monitor and maintain a healthy online environment.</p>
             </div>
-            <a href="{% url 'livewall' %}">
-                <div class="feature-card live-wall">
-                    <h3>Live Wall</h3>
-                    <p>Watch a live stream of tweets as they happen, analyzed and displayed in real-time for instant insights.</p>
-                </div>
-            </a>
         </div>
     </section>
+
+    <!-- CSRF token for Django -->
+    <input type="hidden" name="csrfmiddlewaretoken" value="{% csrf_token %}">
+
+    <script>
+        function getAnalysisColor(type, value) {
+            if (type === 'sentiment') {
+                if (value === 'Positive') return '#2ecc71';
+                if (value === 'Negative') return '#e74c3c';
+                if (value === 'Neutral') return '#95a5a6';
+            } else if (type === 'toxicity') {
+                if (value === 'Toxic') return '#e74c3c';
+                if (value === 'Non-toxic') return '#2ecc71';
+            } else if (type === 'emotion') {
+                return '#e67e22';
+            }
+            return '#95a5a6';
+        }
+
+        const container = document.getElementById('tweet-container');
+
+        async function fetchTweets() {
+            try {
+                const response = await fetch('/api/livewall/getTweets/', {
+                    method: 'GET',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                });
+                if (!response.ok) throw await response.json();
+                return response.json();
+            } catch (error) {
+                console.error('Error fetching tweets:', error);
+                return [];
+            }
+        }
+
+        function createTweetCard(tweet) {
+            const card = document.createElement('div');
+            card.className = 'tweet-card';
+
+            const handle = document.createElement('div');
+            handle.className = 'tweet-handle';
+            handle.textContent = tweet.handle || 'Unknown User';
+            card.appendChild(handle);
+
+            const content = document.createElement('div');
+            content.className = 'tweet-content';
+            content.textContent = tweet.content || 'No content available';
+            card.appendChild(content);
+
+            const timestamp = document.createElement('div');
+            timestamp.className = 'tweet-timestamp';
+            timestamp.textContent = tweet.timestamp || 'No timestamp';
+            card.appendChild(timestamp);
+
+            // Add analysis badges
+            const analysisP = document.createElement('div');
+            analysisP.className = 'tweet-analysis';
+            const analysisTypes = ['sentiment', 'toxicity', 'emotion'];
+            analysisTypes.forEach(type => {
+                if (tweet[type] && tweet[type] !== 'NA') {
+                    const badge = document.createElement('span');
+                    badge.className = 'analysis-badge';
+                    badge.textContent = `${type.charAt(0).toUpperCase() + type.slice(1)}: ${tweet[type]}`;
+                    badge.style.backgroundColor = getAnalysisColor(type, tweet[type]);
+                    analysisP.appendChild(badge);
+                }
+            });
+            if (analysisP.children.length > 0) {
+                card.appendChild(analysisP);
+            }
+
+            return card;
+        }
+
+        async function startLiveWall() {
+            const tweets = await fetchTweets();
+            if (tweets.length === 0) {
+                console.warn('No tweets available.');
+                return;
+            }
+
+            // Duplicate tweets to ensure continuous scrolling
+            const repeatedTweets = [...tweets, ...tweets, ...tweets]; // Repeat 3x to fill space
+            container.innerHTML = '';
+            repeatedTweets.forEach(tweet => {
+                container.appendChild(createTweetCard(tweet));
+            });
+
+            // Adjust animation duration based on content height if needed
+            const totalHeight = container.scrollHeight;
+            const duration = totalHeight / 100; // 50px/s scroll speed, adjust as needed
+            container.style.animationDuration = `${duration}s`;
+        }
+
+        startLiveWall();
+    </script>
 </body>
 </html>

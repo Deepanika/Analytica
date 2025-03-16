@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search History - Analytica</title>
+    <style>
+        body {
+            background-color: #f0f2f5;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h2 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .history-item {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            cursor: pointer;
+        }
+        .history-item:hover {
+            background-color: #f9f9f9;
+        }
+        .popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        .popup-content {
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 8px;
+        }
+        .close-btn {
+            background-color: #e74c3c;
+            color: #fff;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+        }
+        .close-btn:hover {
+            background-color: #c0392b;
+        }
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .no-history {
+            text-align: center;
+            color: #666;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Your Search History</h2>
+        {% if search_history %}
+            {% for history in search_history %}
+                <div class="history-item" onclick="showTweets('{{ history.id }}', '{{ history.search_query }}', '{{ history.search_type }}', '{{ history.analysis_type }}')">
+                    <strong>{{ history.search_type|capfirst }}:</strong> {{ history.search_query }} 
+                    <span style="float: right;">{{ history.timestamp|date:"Y-m-d H:i" }}</span><br>
+                    <small>Analysis: {{ history.analysis_type|capfirst }}</small>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="no-history">No search history available.</p>
+        {% endif %}
+        <p style="text-align: center;"><a href="{% url 'homepage' %}">Back to Homepage</a></p>
+    </div>
+
+    <!-- Popup and Overlay -->
+    <div class="overlay" id="overlay" onclick="hidePopup()"></div>
+    <div class="popup" id="popup">
+        <button class="close-btn" onclick="hidePopup()">Close</button>
+        <h3 id="popup-title"></h3>
+        <div id="popup-tweets"></div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        function showTweets(historyId, query, type, analysisType) {
+            fetch(`/api/history/tweets/${historyId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    const popup = document.getElementById('popup');
+                    const overlay = document.getElementById('overlay');
+                    const title = document.getElementById('popup-title');
+                    const tweetsDiv = document.getElementById('popup-tweets');
+
+                    // Set title with analysis type
+                    title.textContent = `${type.charAt(0).toUpperCase() + type.slice(1)}: ${query} [${analysisType.charAt(0).toUpperCase() + analysisType.slice(1)} Analysis]`;
+
+                    // Clear previous tweets
+                    tweetsDiv.innerHTML = '';
+
+                    // Render tweets with only relevant analysis
+                    data.tweets.forEach(tweet => {
+                        const tweetDiv = document.createElement('div');
+                        tweetDiv.className = 'popup-content';
+
+                        let analysisResult = tweet[analysisType] || 'N/A';
+
+                        tweetDiv.innerHTML = `
+                            <strong>${tweet.handle}</strong><br>
+                            ${tweet.content}<br>
+                            <small><strong>${analysisType.charAt(0).toUpperCase() + analysisType.slice(1)}:</strong> ${analysisResult}</small>
+                        `;
+                        tweetsDiv.appendChild(tweetDiv);
+                    });
+
+                    popup.style.display = 'block';
+                    overlay.style.display = 'block';
+                })
+                .catch(error => console.error('Error fetching tweets:', error));
+        }
+
+        function hidePopup() {
+            document.getElementById('popup').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'twitter_app',  # Add your app here
     'rest_framework',
 ]
-
+AUTH_USER_MODEL = 'twitter_app.User'
+LOGIN_REDIRECT_URL = '/home/'
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

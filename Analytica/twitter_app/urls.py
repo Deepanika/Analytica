@@ -1,21 +1,22 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import index, TweetViewSet, homepage, livewall,SentimentViewSet,ToxicityViewSet,EmotionViewSet,LiveWallViewSet
-
-router = DefaultRouter()
-router.register(r'tweets', TweetViewSet)
-router.register(r'sentiment', SentimentViewSet, basename='sentiment')
-router.register(r'toxicity', ToxicityViewSet, basename='toxicity')
-router.register(r'emotion', EmotionViewSet, basename='emotion')
-router.register(r'livewall',LiveWallViewSet, basename='livewall')
+from django.urls import path
+from . import views
 
 urlpatterns = [
-    path('test/', index, name='index'),
-    path('api/', include(router.urls)),
-    path('home/', homepage,name='homepage'),
-    path('livewall/', livewall,name='livewall')
-    # path('sentiment/', views.sentiment_page, name='sentiment'),
-    # path('toxicity/', views.toxicity_page, name='toxicity'),
-    # path('emotion/', views.emotion_page, name='emotion'),
-
+    path('test/', views.index, name='index'),
+    path('home/', views.homepage, name='homepage'),
+    path('login/', views.CustomLoginView.as_view(), name='login'),
+    path('logout/', views.custom_logout, name='logout'),
+    path('register/', views.register, name='register'),
+    path('livewall/', views.livewall, name='livewall'),
+    path('sentiment/', views.sentiment_page, name='sentiment'),
+    path('toxicity/', views.toxicity_page, name='toxicity'),
+    path('emotion/', views.emotion_page, name='emotion'),
+    path('history/', views.history_page, name='history'),
+    # API views
+    path('api/tweet/scrape/', views.TweetAPIView.as_view(), name='tweet_scrape'),
+    path('api/sentiment/scrape/', views.SentimentAPIView.as_view(), name='sentiment_scrape'),
+    path('api/toxicity/scrape/', views.ToxicityAPIView.as_view(), name='toxicity_scrape'),
+    path('api/emotion/scrape/', views.EmotionAPIView.as_view(), name='emotion_scrape'),
+    path('api/livewall/getTweets/', views.LiveWallAPIView.as_view(), name='livewall_get_tweets'),
+    path('api/history/tweets/<int:history_id>/', views.HistoryAPIView.as_view(), name='history_tweets'),
 ]
