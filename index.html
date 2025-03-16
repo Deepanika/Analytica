@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytica - Twitter Analysis Tool</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        /* Global Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background-color: #000;
+            color: #fff;
+            text-align: center;
+        }
+
+        /* Hero Section */
+        .hero {
+            position: relative;
+            height: 100vh;
+            background: url('https://www.istockphoto.com/photo/deep-space-background-gm178149253-24976202') no-repeat center center/cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .hero-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            font-size: 3rem;
+            font-weight: bold;
+        }
+
+        /* Tweet Animation */
+        .tweet-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .tweet {
+            position: absolute;
+            font-size: 1.2rem;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            color: #fff;
+            white-space: nowrap;
+            animation: floatTweets 10s linear infinite;
+        }
+
+        @keyframes floatTweets {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            20% {
+                opacity: 1;
+            }
+            80% {
+                opacity: 1;
+            }
+            to {
+                transform: translateY(-100%);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">Welcome to Analytica</div>
+        <div class="tweet-container" id="tweetContainer"></div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="feature-card">
+            <i class="fas fa-smile"></i>
+            <h3>Emotion Analysis</h3>
+            <p>Detect emotions from tweets using AI.</p>
+        </div>
+        <div class="feature-card">
+            <i class="fas fa-skull-crossbones"></i>
+            <h3>Toxicity Analysis</h3>
+            <p>Identify toxic and harmful content in tweets.</p>
+        </div>
+        <div class="feature-card">
+            <i class="fas fa-chart-line"></i>
+            <h3>Sentiment Analysis</h3>
+            <p>Classify tweets as positive, negative, or neutral.</p>
+        </div>
+        <div class="feature-card">
+            <i class="fas fa-trophy"></i>
+            <h3>Leaderboard</h3>
+            <p>See top users based on analytics.</p>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="contact">
+        <h2>Contact Us</h2>
+        <div class="contact-info">
+            <div class="contact-card">
+                <i class="fas fa-map-marker-alt"></i>
+                <h3>Address</h3>
+                <p>27 13 Lowe Haven</p>
+            </div>
+            <div class="contact-card">
+                <i class="fas fa-phone"></i>
+                <h3>Phone</h3>
+                <p>111 343 43 43</p>
+            </div>
+            <div class="contact-card">
+                <i class="fas fa-envelope"></i>
+                <h3>Email</h3>
+                <p>business@info.com</p>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const tweetContainer = document.getElementById("tweetContainer");
+
+        // Sample tweets (replace with real Twitter API data)
+        const tweets = [
+            "AI is revolutionizing the world! 🚀 #ArtificialIntelligence",
+            "Just tried Analytica's sentiment analysis tool. Mind-blowing! 🔥 #MachineLearning",
+            "Twitter sentiment analysis is getting better each day! #NLP",
+            "Detecting fake news using AI is the future. #Tech",
+            "Toxicity detection is so crucial in today's digital age! #Safety",
+            "Analytica is a game-changer for social media insights! #DataScience"
+        ];
+
+        function generateTweet() {
+            const tweet = document.createElement("div");
+            tweet.classList.add("tweet");
+            tweet.innerText = tweets[Math.floor(Math.random() * tweets.length)];
+
+            // Random positioning
+            tweet.style.left = `${Math.random() * 80 + 10}%`;
+            tweet.style.top = `${Math.random() * 80 + 10}%`;
+
+            tweetContainer.appendChild(tweet);
+
+            // Remove after animation
+            setTimeout(() => {
+                tweet.remove();
+            }, 10000);
+        }
+
+        // Generate a new tweet every 3 seconds
+        setInterval(generateTweet, 3000);
+    </script>
+
+</body>
+</html>
