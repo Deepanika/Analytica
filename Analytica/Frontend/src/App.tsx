@@ -4,8 +4,15 @@ import { Login } from './pages/Login';
 import { SignUp } from './pages/SignUp';
 import { Analysis } from './pages/Analysis';
 import { Leaderboard } from './pages/Leaderboard';
+import { History } from './pages/History';
+import { useEffect } from 'react';
 
 function App() {
+
+  useEffect(() => {
+    fetch('http://localhost:8000/api/auth/csrf/', { credentials: 'include' }); // ✅ Set CSRF cookie for session
+  }, []);
+  
   return (
     <Router>
       <Routes>
@@ -14,6 +21,7 @@ function App() {
         <Route path="/signup" element={<SignUp />} />
         <Route path="/analysis/:type" element={<Analysis />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
+        <Route path="/history" element={<History />} />
       </Routes>
     </Router>
   );

@@ -50,7 +50,7 @@ class SentimentAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
         sentiment = self.labels[np.argmax(scores)]
         tweet.sentiment = sentiment
         tweet.save()
-        return tweet
+        return sentiment
 
 class ToxicityAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
     def __init__(self):
@@ -77,7 +77,7 @@ class ToxicityAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
         toxicity = self.labels[np.argmax(scores)]
         tweet.toxicity = toxicity
         tweet.save()
-        return tweet
+        return toxicity
 
 class EmotionAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
     def __init__(self):
@@ -104,7 +104,7 @@ class EmotionAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
         emotion = self.labels[np.argmax(scores)]
         tweet.emotion = emotion
         tweet.save()
-        return tweet
+        return emotion
 
 class AnalyzerFactory:
     _analyzers = {

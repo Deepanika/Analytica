@@ -1,23 +1,46 @@
 import { useState } from 'react';
 import { BackgroundTweets } from '../components/BackgroundTweets';
-import { Mail, Lock, LogIn, Loader, Home } from 'lucide-react';
+import { User, Lock, LogIn, Loader, Home } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 export const Login = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState(''); // Changed from email to username
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(''); // For displaying login errors
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
+    setError(''); // Reset error state
 
-    // TODO: Implement actual login logic with backend API
-    setTimeout(() => {
+    try {
+      // Make API call to Django login endpoint
+      const response = await axios.post(
+        'http://localhost:8000/api/auth/login/',
+        {
+          username: username, // Use username instead of email
+          password: password,
+        },
+        { withCredentials: true } // Ensure session cookies are sent/received
+      );
+
+      // On success, log the response and redirect to homepage
+      console.log('Logged in successfully:', response.data);
       setLoading(false);
-      console.log('Logged in with:', { email, password });
-    }, 1500);
+      navigate('/'); // Redirect to homepage route
+    } catch (err) {
+      // Handle errors (e.g., invalid credentials)
+      setLoading(false);
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.error || 'An error occurred during login');
+      } else {
+        setError('An error occurred during login');
+      }
+      console.error('Login failed:', err);
+    }
   };
 
   return (
@@ -39,15 +62,15 @@ export const Login = () => {
         <p className="text-gray-300 text-center mb-6">Log in to continue analyzing tweets</p>
 
         <form onSubmit={handleLogin} className="space-y-6">
-          {/* Email Input */}
+          {/* Username Input */}
           <div className="relative">
-            <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" /> {/* Changed icon from Mail to User */}
             <input
-              type="email"
-              placeholder="Enter your email"
+              type="text" // Changed from email to text
+              placeholder="Enter your username" // Updated placeholder
               className="w-full pl-12 pr-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 outline-none placeholder:text-gray-400 text-white"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
             />
           </div>
@@ -64,6 +87,11 @@ export const Login = () => {
               required
             />
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <p className="text-red-400 text-center">{error}</p>
+          )}
 
           {/* Login Button */}
           <button
