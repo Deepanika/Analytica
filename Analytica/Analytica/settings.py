@@ -73,6 +73,21 @@ DATABASES = {
     }
 }
 
+
+#Config to connect with AWS RDS
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'analytica',
+#         'USER':'postgres',
+#         'PASSWORD':'analytica',
+#         'HOST':'database-1.cg1akyewuxpb.us-east-1.rds.amazonaws.com',
+#         'PORT':'5432',
+#     }
+# }
+
+
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',},
