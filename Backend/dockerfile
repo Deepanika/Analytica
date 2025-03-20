@@ -1,0 +1,22 @@
+FROM archlinux/archlinux:latest
+
+# Update system and install dependencies
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm python python-pip base-devel firefox
+
+WORKDIR /app
+
+# Create and activate virtual environment
+RUN python -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
+# Copy and install dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cpu
+
+# Copy the backend files
+COPY . .
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "python manage.py makemigrations && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]

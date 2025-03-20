@@ -1,0 +1,19 @@
+FROM archlinux/archlinux:latest
+
+# Update system and install Node.js
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm nodejs npm
+
+WORKDIR /app
+
+# Copy package files and install dependencies
+COPY package.json .
+COPY package-lock.json .
+RUN npm install
+
+# Copy frontend files
+COPY . .
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev"]
