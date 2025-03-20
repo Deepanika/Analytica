@@ -20,15 +20,15 @@ from django.http import JsonResponse
 logger = logging.getLogger(__name__)
 
 # Load environment variables
-# load_dotenv()
+load_dotenv()
 
 # # # Singleton scraper instance
-# SCAPER = TwitterScraper.get_instance(
-#     mail=os.getenv("TWITTER_MAIL"),
-#     username=os.getenv("TWITTER_USERNAME"),
-#     password=os.getenv("TWITTER_PASSWORD")
-# )
-# logger.info("Scraper initialized and logged in")
+SCAPER = TwitterScraper.get_instance(
+    mail=os.getenv("TWITTER_MAIL"),
+    username=os.getenv("TWITTER_USERNAME"),
+    password=os.getenv("TWITTER_PASSWORD")
+)
+logger.info("Scraper initialized and logged in")
 
 # Utility Functions
 def get_scraper():
