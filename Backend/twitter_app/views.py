@@ -15,6 +15,8 @@ from django.db.models import Q
 from .forms import RegistrationForm
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.http import JsonResponse
+from langdetect import detect
+from deep_translator import GoogleTranslator
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -22,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# # # Singleton scraper instance
+# Singleton scraper instance
 SCAPER = TwitterScraper.get_instance(
     mail=os.getenv("TWITTER_MAIL"),
     username=os.getenv("TWITTER_USERNAME"),
@@ -44,38 +46,36 @@ def get_scraper():
         )
     return SCAPER
 
-def save_tweets_to_db(tweets_data):
-    """Save scraped tweets to the database and return Tweet objects."""
-    tweets = []
-    for tweet_dict in tweets_data:
-        tweet, _ = Tweet.objects.get_or_create(
-            tweet_id_name=f"{tweet_dict['tweet_id']}_{tweet_dict['timestamp']}",
-            defaults={
-                "handle": tweet_dict["handle"],
-                "content": tweet_dict["content"],
-                "timestamp": tweet_dict["timestamp"],
-            }
-        )
-        tweets.append(tweet)
-    return tweets
+def detect_language(text):
+    """Detect the language of the given text."""
+    try:
+        return detect(text)
+    except Exception as e:
+        logger.error(f"Language detection error: {e}")
+        return 'unknown'
 
+def translate_to_english(text):
+    """Translate text to English using GoogleTranslator."""
+    try:
+        translator = GoogleTranslator(source='auto', target='en')
+        return translator.translate(text)
+    except Exception as e:
+        logger.error(f"Translation error: {e}")
+        return text  # Fallback to original text if translation fails
 
+# Authentication and Utility Views
 class LogoutAPIView(APIView):
-    """API endpoint for user logout."""
     def post(self, request):
-        logout(request)  # Clears session
+        logout(request)
         return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
 
 class AuthStatusAPIView(APIView):
-    """API endpoint to check if user is authenticated."""
     def get(self, request):
         if request.user.is_authenticated:
             return Response({'is_authenticated': True, 'username': request.user.username})
         return Response({'is_authenticated': False})
 
-# ✅ LOGIN VIEW WITH RESTRICTION
 class LoginAPIView(APIView):
-    """API endpoint for user login using session-based authentication."""
     def post(self, request):
         if request.user.is_authenticated:
             return Response({'detail': 'Already logged in'}, status=status.HTTP_400_BAD_REQUEST)
@@ -84,7 +84,7 @@ class LoginAPIView(APIView):
         password = request.data.get('password')
         user = authenticate(request, username=username, password=password)
         if user is not None:
-            login(request, user)  # Sets session cookie
+            login(request, user)
             return Response({
                 'message': 'Logged in successfully',
                 'user_id': user.user_id,
@@ -92,9 +92,7 @@ class LoginAPIView(APIView):
             }, status=status.HTTP_200_OK)
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-# ✅ REGISTER VIEW WITH RESTRICTION
 class RegisterAPIView(APIView):
-    """API endpoint for user registration."""
     def post(self, request):
         if request.user.is_authenticated:
             return Response({'detail': 'Already logged in'}, status=status.HTTP_400_BAD_REQUEST)
@@ -107,21 +105,20 @@ class RegisterAPIView(APIView):
             return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)
         return Response({'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
 
+@ensure_csrf_cookie
 def set_csrf_token(request):
     return JsonResponse({"message": "CSRF cookie set."})
 
 class IndexAPIView(APIView):
-    """API endpoint replacing the index page."""
     def get(self, request):
         return Response({'message': 'Welcome to the index page'})
 
 class HomepageAPIView(APIView):
-    """API endpoint replacing the homepage."""
     def get(self, request):
         return Response({'message': 'Welcome to the homepage'})
 
+# Tweet Analysis Views
 class SentimentAPIView(APIView):
-    """API endpoint for scraping and analyzing tweets for sentiment."""
     def post(self, request):
         try:
             username, hashtag, max_tweets = self._validate_input(request.data)
@@ -135,13 +132,35 @@ class SentimentAPIView(APIView):
             if not tweets_data:
                 return Response({"message": "No tweets found"}, status=status.HTTP_200_OK)
 
-            tweets = save_tweets_to_db(tweets_data)
             analyzed_tweets = []
+            tweets_objects = []
 
-            for tweet in tweets:
-                tweet_data = TweetSerializer(tweet).data  # ✅ Serialize tweet fields
-                tweet_data['sentiment'] = analyze_tweet(tweet, "sentiment")  # ✅ Add sentiment result
-                analyzed_tweets.append(tweet_data)  # ✅ Append combined data
+            for tweet_dict in tweets_data:
+                original_content = tweet_dict['content']
+                language = detect_language(original_content)
+                if language != 'en':
+                    translated_content = translate_to_english(original_content)
+                    content_for_analysis = translated_content
+                else:
+                    translated_content = None
+                    content_for_analysis = original_content
+                
+                sentiment = analyze_tweet(content_for_analysis, "sentiment")
+                
+                tweet, created = Tweet.objects.update_or_create(
+                    tweet_id_name=f"{tweet_dict['tweet_id']}_{tweet_dict['timestamp']}",
+                    defaults={
+                        "handle": tweet_dict["handle"],
+                        "content": original_content,
+                        "translated_content": translated_content,
+                        "timestamp": tweet_dict["timestamp"],
+                        "sentiment": sentiment,
+                    }
+                )
+                tweets_objects.append(tweet)
+                
+                tweet_data = TweetSerializer(tweet).data
+                analyzed_tweets.append(tweet_data)
 
             if request.user.is_authenticated:
                 search_query = username if username else hashtag
@@ -150,9 +169,9 @@ class SentimentAPIView(APIView):
                     user=request.user,
                     search_query=search_query,
                     search_type=search_type,
-                    analysis_type="senitment"
+                    analysis_type="sentiment"
                 )
-                search_history.tweets.set(tweets)
+                search_history.tweets.set(tweets_objects)
                 search_history.save()
             return Response(analyzed_tweets, status=status.HTTP_200_OK)
 
@@ -161,6 +180,7 @@ class SentimentAPIView(APIView):
         except Exception as e:
             logger.error(f"Error in sentiment analysis: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     def _validate_input(self, data):
         username = data.get("username")
         hashtag = data.get("hashtag")
@@ -171,7 +191,6 @@ class SentimentAPIView(APIView):
         return username, hashtag, max_tweets
 
 class ToxicityAPIView(APIView):
-    """API endpoint for scraping and analyzing tweets for toxicity."""
     def post(self, request):
         try:
             username, hashtag, max_tweets = self._validate_input(request.data)
@@ -185,13 +204,35 @@ class ToxicityAPIView(APIView):
             if not tweets_data:
                 return Response({"message": "No tweets found"}, status=status.HTTP_200_OK)
 
-            tweets = save_tweets_to_db(tweets_data)
             analyzed_tweets = []
+            tweets_objects = []
 
-            for tweet in tweets:
-                tweet_data = TweetSerializer(tweet).data  # ✅ Serialize tweet fields
-                tweet_data['toxicity'] = analyze_tweet(tweet, "toxicity")  # ✅ Add toxicity result
-                analyzed_tweets.append(tweet_data)  # ✅ Append combined data
+            for tweet_dict in tweets_data:
+                original_content = tweet_dict['content']
+                language = detect_language(original_content)
+                if language != 'en':
+                    translated_content = translate_to_english(original_content)
+                    content_for_analysis = translated_content
+                else:
+                    translated_content = None
+                    content_for_analysis = original_content
+                
+                toxicity = analyze_tweet(content_for_analysis, "toxicity")
+                
+                tweet, created = Tweet.objects.update_or_create(
+                    tweet_id_name=f"{tweet_dict['tweet_id']}_{tweet_dict['timestamp']}",
+                    defaults={
+                        "handle": tweet_dict["handle"],
+                        "content": original_content,
+                        "translated_content": translated_content,
+                        "timestamp": tweet_dict["timestamp"],
+                        "toxicity": toxicity,
+                    }
+                )
+                tweets_objects.append(tweet)
+                
+                tweet_data = TweetSerializer(tweet).data
+                analyzed_tweets.append(tweet_data)
 
             if request.user.is_authenticated:
                 search_query = username if username else hashtag
@@ -202,7 +243,7 @@ class ToxicityAPIView(APIView):
                     search_type=search_type,
                     analysis_type="toxicity"
                 )
-                search_history.tweets.set(tweets)
+                search_history.tweets.set(tweets_objects)
                 search_history.save()
             return Response(analyzed_tweets, status=status.HTTP_200_OK)
 
@@ -211,7 +252,6 @@ class ToxicityAPIView(APIView):
         except Exception as e:
             logger.error(f"Error in toxicity analysis: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
     def _validate_input(self, data):
         username = data.get("username")
@@ -223,7 +263,6 @@ class ToxicityAPIView(APIView):
         return username, hashtag, max_tweets
 
 class EmotionAPIView(APIView):
-    """API endpoint for scraping and analyzing tweets for emotion."""
     def post(self, request):
         try:
             username, hashtag, max_tweets = self._validate_input(request.data)
@@ -237,14 +276,36 @@ class EmotionAPIView(APIView):
             if not tweets_data:
                 return Response({"message": "No tweets found"}, status=status.HTTP_200_OK)
 
-            tweets = save_tweets_to_db(tweets_data)
             analyzed_tweets = []
+            tweets_objects = []
 
-            for tweet in tweets:
-                tweet_data = TweetSerializer(tweet).data  # ✅ Serialize tweet fields
-                tweet_data['emotion'] = analyze_tweet(tweet, "emotion")  # ✅ Add analysis result
+            for tweet_dict in tweets_data:
+                original_content = tweet_dict['content']
+                language = detect_language(original_content)
+                if language != 'en':
+                    translated_content = translate_to_english(original_content)
+                    content_for_analysis = translated_content
+                else:
+                    translated_content = None
+                    content_for_analysis = original_content
+                
+                emotion = analyze_tweet(content_for_analysis, "emotion")
+                
+                tweet, created = Tweet.objects.update_or_create(
+                    tweet_id_name=f"{tweet_dict['tweet_id']}_{tweet_dict['timestamp']}",
+                    defaults={
+                        "handle": tweet_dict["handle"],
+                        "content": original_content,
+                        "translated_content": translated_content,
+                        "timestamp": tweet_dict["timestamp"],
+                        "emotion": emotion,
+                    }
+                )
+                tweets_objects.append(tweet)
+                
+                tweet_data = TweetSerializer(tweet).data
                 analyzed_tweets.append(tweet_data)
-            
+
             if request.user.is_authenticated:
                 search_query = username if username else hashtag
                 search_type = "username" if username else "hashtag"
@@ -254,7 +315,7 @@ class EmotionAPIView(APIView):
                     search_type=search_type,
                     analysis_type="emotion"
                 )
-                search_history.tweets.set(tweets)
+                search_history.tweets.set(tweets_objects)
                 search_history.save()
 
             return Response(analyzed_tweets, status=status.HTTP_200_OK)
@@ -265,7 +326,6 @@ class EmotionAPIView(APIView):
             logger.error(f"Error in emotion analysis: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
     def _validate_input(self, data):
         username = data.get("username")
         hashtag = data.get("hashtag")
@@ -275,54 +335,69 @@ class EmotionAPIView(APIView):
             raise ValueError("Enter either username or hashtag, not both")
         return username, hashtag, max_tweets
 
-class LiveWallAPIView(APIView):
-    """API endpoint for fetching random analyzed tweets for the live wall."""
-    def get(self, request):
-        try:
-            analyzed_tweets = Tweet.objects.filter(
-                Q(sentiment__isnull=False) | Q(toxicity__isnull=False) | Q(emotion__isnull=False)
-            ).order_by('?')[:100]
-            serialized_tweets = TweetSerializer(analyzed_tweets, many=True).data
-            return Response(serialized_tweets)
-        except Exception as e:
-            logger.error(f"Error fetching analyzed tweets: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 class TweetAPIView(APIView):
-    """API endpoint for combined and specific analysis on tweets."""
-
     def post(self, request):
         try:
             analysis_type = request.data.get("analysis_type")
-            if analysis_type not in ["sentiment", "toxicity", "emotion", "offensive", "combined"]:
+            if analysis_type not in ["sentiment", "toxicity", "emotion", "combined"]:
                 return Response({"error": "Invalid analysis type"}, status=status.HTTP_400_BAD_REQUEST)
 
             username, hashtag, max_tweets = self._validate_input(request.data)
             scraper = get_scraper()
             tweets_data = scraper.scrape_tweets(
-                max_tweets=max_tweets, scrape_username=username, scrape_hashtag=hashtag
+                max_tweets=max_tweets,
+                scrape_username=username,
+                scrape_hashtag=hashtag
             )
 
             if not tweets_data:
                 return Response({"message": "No tweets found"}, status=status.HTTP_200_OK)
 
-            tweets = save_tweets_to_db(tweets_data)
             analyzed_tweets = []
+            tweets_objects = []
 
-            for tweet in tweets:
-                tweet_data = TweetSerializer(tweet).data  # ✅ Serialize tweet fields
-
-                # ✅ Add analysis results
-                if analysis_type == "combined":
-                    tweet_data["sentiment"] = analyze_tweet(tweet, "sentiment")  # string result
-                    tweet_data["toxicity"] = analyze_tweet(tweet, "toxicity")
-                    tweet_data["emotion"] = analyze_tweet(tweet, "emotion")
+            for tweet_dict in tweets_data:
+                original_content = tweet_dict['content']
+                language = detect_language(original_content)
+                if language != 'en':
+                    translated_content = translate_to_english(original_content)
+                    content_for_analysis = translated_content
                 else:
-                    tweet_data[analysis_type] = analyze_tweet(tweet, analysis_type)  # single analysis
+                    translated_content = None
+                    content_for_analysis = original_content
 
-                analyzed_tweets.append(tweet_data)  # ✅ Now contains all tweet data + analysis
+                if analysis_type == "combined":
+                    sentiment = analyze_tweet(content_for_analysis, "sentiment")
+                    toxicity = analyze_tweet(content_for_analysis, "toxicity")
+                    emotion = analyze_tweet(content_for_analysis, "emotion")
+                    defaults = {
+                        "handle": tweet_dict["handle"],
+                        "content": original_content,
+                        "translated_content": translated_content,
+                        "timestamp": tweet_dict["timestamp"],
+                        "sentiment": sentiment,
+                        "toxicity": toxicity,
+                        "emotion": emotion,
+                    }
+                else:
+                    result = analyze_tweet(content_for_analysis, analysis_type)
+                    defaults = {
+                        "handle": tweet_dict["handle"],
+                        "content": original_content,
+                        "translated_content": translated_content,
+                        "timestamp": tweet_dict["timestamp"],
+                        analysis_type: result,
+                    }
 
-            # ✅ Save search history
+                tweet, created = Tweet.objects.update_or_create(
+                    tweet_id_name=f"{tweet_dict['tweet_id']}_{tweet_dict['timestamp']}",
+                    defaults=defaults
+                )
+                tweets_objects.append(tweet)
+                
+                tweet_data = TweetSerializer(tweet).data
+                analyzed_tweets.append(tweet_data)
+
             if request.user.is_authenticated:
                 search_query = username if username else hashtag
                 search_type = "username" if username else "hashtag"
@@ -332,10 +407,10 @@ class TweetAPIView(APIView):
                     search_type=search_type,
                     analysis_type=analysis_type
                 )
-                search_history.tweets.set(tweets)
+                search_history.tweets.set(tweets_objects)
                 search_history.save()
 
-            return Response(analyzed_tweets, status=200)  # ✅ Ready for frontend
+            return Response(analyzed_tweets, status=status.HTTP_200_OK)
 
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -352,10 +427,21 @@ class TweetAPIView(APIView):
             raise ValueError("Enter either username or hashtag, not both")
         return username, hashtag, max_tweets
 
+# Display Views
+class LiveWallAPIView(APIView):
+    def get(self, request):
+        try:
+            analyzed_tweets = Tweet.objects.filter(
+                Q(sentiment__isnull=False) | Q(toxicity__isnull=False) | Q(emotion__isnull=False)
+            ).order_by('?')[:100]
+            serialized_tweets = TweetSerializer(analyzed_tweets, many=True).data
+            return Response(serialized_tweets)
+        except Exception as e:
+            logger.error(f"Error fetching analyzed tweets: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class HistoryAPIView(APIView):
-    """API endpoint to fetch tweets from a user's search history."""
-    permission_classes = [IsAuthenticated]  # Restrict to logged-in users
+    permission_classes = [IsAuthenticated]
     def get(self, request, history_id):
         try:
             history = userSearchHistory.objects.get(id=history_id, user=request.user)
@@ -369,7 +455,6 @@ class HistoryAPIView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class HistoryPageAPIView(APIView):
-    """API endpoint replacing the history page."""
     permission_classes = [IsAuthenticated]
     def get(self, request):
         search_history = userSearchHistory.objects.filter(user=request.user).order_by('-timestamp')

@@ -9,4 +9,4 @@ from .models import Tweet
 class TweetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tweet
-        fields = ['handle', 'content', 'sentiment', 'toxicity', 'emotion','timestamp']
+        fields = ['handle', 'content','translated_content', 'sentiment', 'toxicity', 'emotion','timestamp']

@@ -1,6 +1,6 @@
 import joblib
 import pickle
-from .models import Tweet  # Import the Tweet model
+from .models import Tweet  # Still imported for reference elsewhere
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 import numpy as np
 from scipy.special import softmax
@@ -14,7 +14,7 @@ def preprocess(text):
     return " ".join(new_text)
 
 class BaseAnalyzer:
-    def analyze(self, tweet):
+    def analyze(self, text):
         raise NotImplementedError("Subclasses must implement this method")
 
 class SingletonMeta(type):
@@ -39,18 +39,16 @@ class SentimentAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
                 self.tokenizer = None
                 self._initialized = False
 
-    def analyze(self, tweet):
+    def analyze(self, text):
         if self.model is None or self.tokenizer is None:
             raise RuntimeError("Sentiment model or tokenizer not initialized.")
-        content = preprocess(tweet.content)
+        content = preprocess(text)
         encoded_input = self.tokenizer(content, return_tensors='pt')
         try:
             output = self.model(**encoded_input)
             scores = output[0][0].detach().numpy()
             scores = softmax(scores)
             sentiment = self.labels[np.argmax(scores)]
-            tweet.sentiment = sentiment
-            tweet.save()
             return sentiment
         except Exception as e:
             print(f"Error analyzing sentiment: {e}")
@@ -70,18 +68,16 @@ class ToxicityAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
                 self.tokenizer = None
                 self._initialized = False
 
-    def analyze(self, tweet):
+    def analyze(self, text):
         if self.model is None or self.tokenizer is None:
             raise RuntimeError("Toxicity model or tokenizer not initialized.")
-        content = preprocess(tweet.content)
+        content = preprocess(text)
         encoded_input = self.tokenizer(content, return_tensors='pt')
         try:
             output = self.model(**encoded_input)
             scores = output[0][0].detach().numpy()
             scores = softmax(scores)
             toxicity = self.labels[np.argmax(scores)]
-            tweet.toxicity = toxicity
-            tweet.save()
             return toxicity
         except Exception as e:
             print(f"Error analyzing toxicity: {e}")
@@ -101,18 +97,16 @@ class EmotionAnalyzer(BaseAnalyzer, metaclass=SingletonMeta):
                 self.tokenizer = None
                 self._initialized = False
 
-    def analyze(self, tweet):
+    def analyze(self, text):
         if self.model is None or self.tokenizer is None:
             raise RuntimeError("Emotion model or tokenizer not initialized.")
-        content = preprocess(tweet.content)
+        content = preprocess(text)
         encoded_input = self.tokenizer(content, return_tensors='pt')
         try:
             output = self.model(**encoded_input)
             scores = output[0][0].detach().numpy()
             scores = softmax(scores)
             emotion = self.labels[np.argmax(scores)]
-            tweet.emotion = emotion
-            tweet.save()
             return emotion
         except Exception as e:
             print(f"Error analyzing emotion: {e}")
@@ -131,7 +125,6 @@ class AnalyzerFactory:
             raise ValueError(f"Unknown analysis type: {analysis_type}")
         return AnalyzerFactory._analyzers[analysis_type]
 
-# Example usage
-def analyze_tweet(tweet, analysis_type):
+def analyze_tweet(text, analysis_type):
     analyzer = AnalyzerFactory.get_analyzer(analysis_type)
-    return analyzer.analyze(tweet)
+    return analyzer.analyze(text)

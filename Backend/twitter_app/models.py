@@ -36,6 +36,7 @@ class Tweet(models.Model):
     id = models.AutoField(primary_key=True)
     tweet_id_name = models.CharField(max_length=255)
     content = models.TextField()
+    translated_content = models.TextField(blank=True, null=True)
     handle = models.CharField(max_length=255)
     timestamp = models.CharField(max_length=255)
     sentiment = models.CharField(max_length=20, blank=True, default="NA")
