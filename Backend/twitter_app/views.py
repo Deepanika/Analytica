@@ -164,7 +164,7 @@ class SentimentAPIView(APIView):
     def _validate_input(self, data):
         username = data.get("username")
         hashtag = data.get("hashtag")
-        max_tweets = int(data.get("max_tweets", 50))
+        max_tweets = int(data.get("max_tweets", 100))
         targets = [t for t in [username, hashtag] if t]
         if len(targets) != 1:
             raise ValueError("Enter either username or hashtag, not both")

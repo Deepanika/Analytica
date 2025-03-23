@@ -77,7 +77,7 @@ class TwitterScraper:
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument(f"--user-agent={header}")
 
-        gecko_path = "/home/kartik/Desktop/Analytica 2.0/Analytica/twitter_app/geckodriver"
+        gecko_path = os.path.join(os.path.dirname(__file__), "geckodriver")
         if os.path.exists(gecko_path):
             service = FirefoxService(executable_path=gecko_path)
             logging.info("Using local geckodriver")
