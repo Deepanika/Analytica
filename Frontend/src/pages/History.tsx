@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getCookie } from '../utils/csrf';
-import { Calendar, Search, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Calendar, Search, ArrowRight, ArrowLeft, BarChart2 } from 'lucide-react';
 import { BackgroundTweets } from '../components/BackgroundTweets';
+import { AnalyticsModal } from '../components/AnalyticsModal';
 
 interface HistoryEntry {
   id: number;
@@ -18,7 +19,7 @@ interface Tweet {
   content: string;
   timestamp: string;
   sentiment?: string;
-  toxicity?: number;
+  toxicity?: string;
   emotion?: string;
 }
 
@@ -73,6 +74,7 @@ export const History = () => {
   const [selectedHistory, setSelectedHistory] = useState<number | null>(null);
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
   useEffect(() => {
     fetchSearchHistory();
@@ -151,6 +153,8 @@ export const History = () => {
     );
   }
 
+  const selectedEntry = searchHistory.find(entry => entry.id === selectedHistory);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white p-8">
       <BackgroundTweets />
@@ -203,7 +207,16 @@ export const History = () => {
           <div className="lg:col-span-2">
             {selectedHistory ? (
               <div className="space-y-4">
-                <h2 className="text-2xl font-semibold mb-4">Analysis Results</h2>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold">Analysis Results</h2>
+                  <button
+                    onClick={() => setIsAnalyticsOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors"
+                  >
+                    <BarChart2 className="w-5 h-5" />
+                    View Analytics
+                  </button>
+                </div>
                 {tweets.map((tweet) => (
                   <div key={tweet.id} className="p-4 rounded-lg bg-white/10 backdrop-blur">
                     <div className="flex items-center gap-2 mb-2">
@@ -214,7 +227,7 @@ export const History = () => {
                     <div className="flex flex-wrap gap-3">
                       {getAnalysisDisplay(
                         tweet,
-                        searchHistory.find((entry) => entry.id === selectedHistory)?.analysis_type || ''
+                        selectedEntry?.analysis_type || ''
                       )}
                     </div>
                   </div>
@@ -230,6 +243,13 @@ export const History = () => {
             )}
           </div>
         </div>
+
+        <AnalyticsModal
+          isOpen={isAnalyticsOpen}
+          onClose={() => setIsAnalyticsOpen(false)}
+          tweets={tweets}
+          type={selectedEntry?.analysis_type}
+        />
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/sentiment/scrape/', views.SentimentAPIView.as_view(), name='sentiment_scrape'),
     path('api/toxicity/scrape/', views.ToxicityAPIView.as_view(), name='toxicity_scrape'),
     path('api/emotion/scrape/', views.EmotionAPIView.as_view(), name='emotion_scrape'),
-    path('api/livewall/getTweets/', views.LiveWallAPIView.as_view(), name='livewall_get_tweets'),
+    path('api/livewall/', views.LiveWallAPIView.as_view(), name='livewall_get_tweets'),
     path('api/history/tweets/<int:history_id>/', views.HistoryAPIView.as_view(), name='history_tweets'),
+    path('api/leaderboard/', views.LeaderboardAPIView.as_view(), name='leaderboard'),
 ]

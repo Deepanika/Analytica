@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { BackgroundTweets } from '../components/BackgroundTweets';
-import { Brain, Heart, AlertTriangle, BarChart2, Trophy, History } from 'lucide-react';
+import { Brain, Heart, AlertTriangle, BarChart2, Trophy, History, MessageSquareText } from 'lucide-react';
 import { getCookie } from '../utils/csrf';
 
 export const Home = () => {
@@ -41,6 +41,14 @@ export const Home = () => {
       icon: BarChart2,
       color: 'from-green-500 to-teal-600',
       path: '/analysis/sentimental'
+    },
+    {
+      id: 'livewall',
+      title: 'Live Wall',
+      description: 'Watch real-time analyzed tweets flow through our dynamic wall display.',
+      icon: MessageSquareText,
+      color: 'from-indigo-500 to-blue-600',
+      path: '/livewall'
     },
     {
       id: 'leaderboard',
@@ -136,7 +144,7 @@ export const Home = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {analysisTypes.map((type) => (
             <div
               key={type.id}
@@ -162,4 +170,4 @@ export const Home = () => {
   );
 };
 
-export default Home
+export default Home;

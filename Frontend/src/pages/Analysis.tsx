@@ -3,7 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { AnalysisForm } from '../components/AnalysisForm';
 import { BackgroundTweets } from '../components/BackgroundTweets';
 import { TweetCard } from '../components/TweetCard';
-import { ArrowLeft } from 'lucide-react';
+import { AnalyticsModal } from '../components/AnalyticsModal';
+import { ArrowLeft, BarChart2 } from 'lucide-react';
 import { getCookie } from '../utils/csrf';
 
 const backgrounds = {
@@ -18,6 +19,7 @@ export const Analysis = () => {
   const [result, setResult] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
   const apiPaths: Record<string, string> = {
     combined: 'http://localhost:8000/api/combined/scrape/',
@@ -116,25 +118,45 @@ export const Analysis = () => {
         )}
 
         {result.length > 0 && (
-          <div className="mt-10 space-y-6 max-w-3xl mx-auto">
-            {result.map((tweet, idx) => (
-              <TweetCard
-                key={idx}
-                tweet={{
-                  content: tweet.content,
-                  handle: tweet.handle || '@user',
-                  timestamp: tweet.timestamp || new Date().toISOString(),
-                  tweet_id: tweet.tweet_id || String(idx)
-                }}
-                analysis={{
-                  sentiment: tweet.sentiment,
-                  emotion: tweet.emotion,
-                  toxicity: tweet.toxicity
-                }}
-                type={type}
-              />
-            ))}
-          </div>
+          <>
+            <div className="mt-10 flex justify-center">
+              <button
+                onClick={() => setIsAnalyticsOpen(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors"
+              >
+                <BarChart2 className="w-5 h-5" />
+                View Analytics
+              </button>
+            </div>
+
+            <div className="mt-10 space-y-6 max-w-3xl mx-auto">
+              {result.map((tweet, idx) => (
+                <TweetCard
+                  key={idx}
+                  tweet={{
+                    content: tweet.content,
+                    handle: tweet.handle || '@user',
+                    timestamp: tweet.timestamp || new Date().toISOString(),
+                    tweet_id: tweet.tweet_id || String(idx),
+                    translated_content: tweet.translated_content || ''
+                  }}
+                  analysis={{
+                    sentiment: tweet.sentiment,
+                    emotion: tweet.emotion,
+                    toxicity: tweet.toxicity
+                  }}
+                  type={type}
+                />
+              ))}
+            </div>
+
+            <AnalyticsModal
+              isOpen={isAnalyticsOpen}
+              onClose={() => setIsAnalyticsOpen(false)}
+              tweets={result}
+              type={type}
+            />
+          </>
         )}
       </div>
     </div>

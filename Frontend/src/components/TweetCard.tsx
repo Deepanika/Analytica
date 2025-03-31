@@ -6,6 +6,7 @@ interface Tweet {
   handle: string;
   timestamp: string;
   tweet_id: string;
+  translated_content?: string; // Added optional translated_content field
 }
 
 interface TweetCardProps {
@@ -20,7 +21,7 @@ interface TweetCardProps {
 
 export const TweetCard = ({ tweet, analysis, type }: TweetCardProps) => {
   const formattedDate = formatDistanceToNow(new Date(tweet.timestamp), { addSuffix: true });
-  
+
   return (
     <div className="bg-white/5 backdrop-blur-lg rounded-xl p-6 border border-white/10 hover:border-white/20 transition-all">
       <div className="flex items-start gap-4">
@@ -28,17 +29,25 @@ export const TweetCard = ({ tweet, analysis, type }: TweetCardProps) => {
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
           <Twitter className="w-6 h-6 text-white" />
         </div>
-        
+
         <div className="flex-1">
           {/* Tweet Header */}
           <div className="flex items-center gap-2 mb-1">
             <span className="font-bold text-white">{tweet.handle}</span>
             <span className="text-gray-400">{formattedDate}</span>
           </div>
-          
+
           {/* Tweet Content */}
           <p className="text-white/90 mb-4 text-lg">{tweet.content}</p>
-          
+
+          {/* Translated Content */}
+          {tweet.translated_content && (
+            <div className="mt-2 mb-4">
+              <p className="text-white/60 text-sm">Translation:</p>
+              <p className="text-white/80 text-lg">{tweet.translated_content}</p>
+            </div>
+          )}
+
           {/* Analysis Results */}
           <div className="grid gap-3">
             {type === 'combined' && (

@@ -5,6 +5,7 @@ import { SignUp } from './pages/SignUp';
 import { Analysis } from './pages/Analysis';
 import { Leaderboard } from './pages/Leaderboard';
 import { History } from './pages/History';
+import LiveWall from './pages/LiveWall';
 import { useEffect } from 'react';
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
         <Route path="/analysis/:type" element={<Analysis />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/history" element={<History />} />
+        <Route path="/livewall" element={<LiveWall />} />
       </Routes>
     </Router>
   );

@@ -17,6 +17,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.http import JsonResponse
 from langdetect import detect
 from deep_translator import GoogleTranslator
+from django.db.models import Count, Avg
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -431,13 +432,14 @@ class TweetAPIView(APIView):
 class LiveWallAPIView(APIView):
     def get(self, request):
         try:
+            # Fetch tweets with sentiment, toxicity, or emotion analysis
             analyzed_tweets = Tweet.objects.filter(
                 Q(sentiment__isnull=False) | Q(toxicity__isnull=False) | Q(emotion__isnull=False)
-            ).order_by('?')[:100]
+            ).order_by('-timestamp')[:50]  # Fetch the latest 50 tweets
             serialized_tweets = TweetSerializer(analyzed_tweets, many=True).data
-            return Response(serialized_tweets)
+            return Response(serialized_tweets, status=status.HTTP_200_OK)
         except Exception as e:
-            logger.error(f"Error fetching analyzed tweets: {e}")
+            logger.error(f"Error fetching live tweets: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class HistoryAPIView(APIView):
@@ -468,3 +470,109 @@ class HistoryPageAPIView(APIView):
             } for entry in search_history
         ]
         return Response({'search_history': serialized_history})
+
+class LeaderboardAPIView(APIView):
+    def get(self, request):
+        try:
+            # Get query parameters
+            board_type = request.query_params.get('type', 'username')  # 'username' or 'hashtag'
+            category = request.query_params.get('category', 'positive')  # 'positive', 'negative', 'toxic', etc.
+            limit = int(request.query_params.get('limit', 10))  # Number of results to return
+            
+            # Initialize query based on board type
+            if board_type == 'username':
+                queryset = Tweet.objects.values('handle')
+            elif board_type == 'hashtag':
+                return Response(self._get_hashtag_leaderboard(category, limit))
+            else:
+                return Response({"error": "Invalid type. Use 'username' or 'hashtag'."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Apply filters based on category
+            if category == 'positive':
+                queryset = queryset.filter(sentiment='Positive').annotate(count=Count('id')).order_by('-count')
+            elif category == 'negative':
+                queryset = queryset.filter(sentiment='Negative').annotate(count=Count('id')).order_by('-count')
+            elif category == 'toxic':
+                queryset = queryset.filter(toxicity='offensive').annotate(count=Count('id')).order_by('-count')
+            elif category == 'non_toxic':
+                queryset = queryset.filter(toxicity='not-offensive').annotate(count=Count('id')).order_by('-count')
+            elif category in ['joy', 'sadness', 'anger', 'optimism']:
+                queryset = queryset.filter(emotion=category).annotate(count=Count('id')).order_by('-count')
+            elif category == 'active':
+                queryset = queryset.annotate(count=Count('id')).order_by('-count')
+            else:
+                return Response({"error": "Invalid category."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Limit the results
+            results = queryset[:limit]
+            
+            # Get a sample tweet for each entry
+            leaderboard = []
+            for entry in results:
+                item = {
+                    board_type: entry['handle'] if board_type == 'username' else entry['hashtag'],
+                    'count': entry['count'],
+                    'rank': list(results).index(entry) + 1
+                }
+                sample_tweet = Tweet.objects.filter(handle=entry['handle']).order_by('-timestamp').first() if board_type == 'username' else None
+                if sample_tweet:
+                    item['sample_tweet'] = TweetSerializer(sample_tweet).data
+                leaderboard.append(item)
+            
+            return Response({
+                'leaderboard_type': board_type,
+                'category': category,
+                'results': leaderboard
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error generating leaderboard: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _get_hashtag_leaderboard(self, category, limit):
+        """Generate hashtag leaderboard by analyzing tweet content for hashtags"""
+        import re
+        from collections import Counter
+        
+        hashtag_count = Counter()
+        
+        # Get tweets based on category
+        if category == 'positive':
+            tweets = Tweet.objects.filter(sentiment='Positive')
+        elif category == 'negative':
+            tweets = Tweet.objects.filter(sentiment='Negative')
+        elif category == 'toxic':
+            tweets = Tweet.objects.filter(toxicity='offensive')
+        elif category == 'non_toxic':
+            tweets = Tweet.objects.filter(toxicity='not-offensive')
+        elif category in ['joy', 'sadness', 'anger', 'optimism']:
+            tweets = Tweet.objects.filter(emotion=category)
+        else:  # active
+            tweets = Tweet.objects.all()
+        
+        # Extract hashtags from tweets
+        for tweet in tweets:
+            hashtags = re.findall(r'#(\w+)', tweet.content)
+            for tag in hashtags:
+                hashtag_count[tag.lower()] += 1
+        
+        # Convert to required format
+        results = []
+        rank = 1
+        for tag, count in hashtag_count.most_common(limit):
+            sample_tweet = Tweet.objects.filter(content__icontains=f'#{tag}').order_by('-timestamp').first()
+            item = {
+                'hashtag': tag,
+                'count': count,
+                'rank': rank
+            }
+            if sample_tweet:
+                item['sample_tweet'] = TweetSerializer(sample_tweet).data
+            
+            results.append(item)
+            rank += 1
+        
+        return {
+            'leaderboard_type': 'hashtag',
+            'category': category,
+            'results': results
+        }
